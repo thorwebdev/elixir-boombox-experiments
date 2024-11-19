@@ -1,0 +1,55 @@
+<main>
+    <h1>Boombox stream WebRTC to browser example</h1>
+    <div>
+      Boombox URL: <input type="text" value="ws://localhost:8830" id="url" /> <button id="button">Connect</button>
+    </div>
+    <br>
+    <video id="videoPlayer" controls muted autoplay></video>
+  </main>
+  <script>
+    const pcConfig = { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' },] };
+    const button = document.getElementById("button");
+    const connStatus = document.getElementById("status");
+    const url = document.getElementById("url");
+    const videoPlayer = document.getElementById("videoPlayer");
+
+    const connectRTC = async (ws) => {
+      videoPlayer.srcObject = new MediaStream();
+
+      const pc = new RTCPeerConnection(pcConfig);
+      pc.ontrack = event => videoPlayer.srcObject.addTrack(event.track);
+      videoPlayer.play();
+      pc.onicecandidate = event => {
+        if (event.candidate === null) return;
+
+        console.log("Sent ICE candidate:", event.candidate);
+        ws.send(JSON.stringify({ type: "ice_candidate", data: event.candidate }));
+      };
+
+      ws.onmessage = async event => {
+        const { type, data } = JSON.parse(event.data);
+
+        switch (type) {
+          case "sdp_offer":
+            console.log("Received SDP offer:", data);
+            await pc.setRemoteDescription(data);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            ws.send(JSON.stringify({ type: "sdp_answer", data: answer }));
+            console.log("Sent SDP answer:", answer)
+            break;
+          case "ice_candidate":
+            console.log("Recieved ICE candidate:", data);
+            await pc.addIceCandidate(data);
+        }
+      };
+    };
+
+    const connect = () => {
+      const ws = new WebSocket(url.value);
+      ws.onopen = () => connectRTC(ws);
+      ws.onclose = event => console.log("WebSocket connection was terminated:", event);
+    }
+
+    button.onclick = connect;
+  </script>

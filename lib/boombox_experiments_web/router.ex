@@ -18,6 +18,7 @@ defmodule BoomboxExperimentsWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    get "/logo-stream", LogoStreamController, :index
   end
 
   # Other scopes may use custom stacks.
